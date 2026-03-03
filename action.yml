@@ -23,6 +23,9 @@ inputs:
   registry-token:
     description: Token for GHCR authentication on deploy host
     default: ""
+  upgrade:
+    description: Upgrade flow-deploy on each host if behind the latest release
+    default: "false"
   version:
     description: flow-deploy version (tag) to install — "latest" or "vX.Y.Z"
     default: latest
@@ -60,6 +63,34 @@ runs:
         touch .env
         hosts=$(flow-deploy config)
         echo "hosts=$hosts" >> "$GITHUB_OUTPUT"
+
+    - name: Upgrade flow-deploy on hosts
+      if: inputs.upgrade == 'true'
+      shell: bash
+      env:
+        HOSTS_JSON: ${{ steps.discover.outputs.hosts }}
+        SSH_PORT: ${{ inputs.ssh-port }}
+      run: |
+        port_args=()
+        if [ -n "$SSH_PORT" ]; then
+          port_args=(-p "$SSH_PORT")
+        fi
+
+        upgraded=()
+        echo "$HOSTS_JSON" | jq -c '.[]' | while read -r group; do
+          host=$(echo "$group" | jq -r '.host')
+          user=$(echo "$group" | jq -r '.user')
+          host_key="$user@$host"
+
+          for seen in "${upgraded[@]}"; do
+            [ "$seen" = "$host_key" ] && continue 2
+          done
+          upgraded+=("$host_key")
+
+          echo "::group::Upgrade $host_key"
+          ssh -o StrictHostKeyChecking=no "${port_args[@]}" "$host_key" "flow-deploy upgrade"
+          echo "::endgroup::"
+        done
 
     - name: Deploy to hosts
       shell: bash
