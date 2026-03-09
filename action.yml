@@ -58,6 +58,7 @@ runs:
       env:
         HOST_NAME: ${{ inputs.host }}
         HOST_USER: ${{ inputs.user }}
+        SSH_PORT: ${{ inputs.ssh-port }}
         COMPOSE_COMMAND: ${{ inputs.command }}
       run: |
         touch .env
@@ -69,18 +70,20 @@ runs:
       shell: bash
       env:
         HOSTS_JSON: ${{ steps.discover.outputs.hosts }}
-        SSH_PORT: ${{ inputs.ssh-port }}
+        SSH_PORT_INPUT: ${{ inputs.ssh-port }}
       run: |
-        port_args=()
-        if [ -n "$SSH_PORT" ]; then
-          port_args=(-p "$SSH_PORT")
-        fi
-
         upgraded=()
         echo "$HOSTS_JSON" | jq -c '.[]' | while read -r group; do
           host=$(echo "$group" | jq -r '.host')
           user=$(echo "$group" | jq -r '.user')
+          port=$(echo "$group" | jq -r '.port // empty')
+          port="${port:-$SSH_PORT_INPUT}"
           host_key="$user@$host"
+
+          port_args=()
+          if [ -n "$port" ]; then
+            port_args=(-p "$port")
+          fi
 
           for seen in "${upgraded[@]}"; do
             [ "$seen" = "$host_key" ] && continue 2
@@ -97,18 +100,20 @@ runs:
       env:
         DEPLOY_TAG: ${{ inputs.tag }}
         HOSTS_JSON: ${{ steps.discover.outputs.hosts }}
-        SSH_PORT: ${{ inputs.ssh-port }}
+        SSH_PORT_INPUT: ${{ inputs.ssh-port }}
         REGISTRY_TOKEN: ${{ inputs.registry-token }}
       run: |
-        port_args=()
-        if [ -n "$SSH_PORT" ]; then
-          port_args=(-p "$SSH_PORT")
-        fi
-
         echo "$HOSTS_JSON" | jq -c '.[]' | while read -r group; do
           host=$(echo "$group" | jq -r '.host')
           user=$(echo "$group" | jq -r '.user')
           dir=$(echo "$group" | jq -r '.dir')
+          port=$(echo "$group" | jq -r '.port // empty')
+          port="${port:-$SSH_PORT_INPUT}"
+
+          port_args=()
+          if [ -n "$port" ]; then
+            port_args=(-p "$port")
+          fi
 
           echo "::group::Deploy to $user@$host:$dir"
 
