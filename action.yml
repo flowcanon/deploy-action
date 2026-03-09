@@ -123,7 +123,7 @@ runs:
           fi
 
           ssh -o StrictHostKeyChecking=no "${port_args[@]}" "$user@$host" \
-            "cd $dir && git pull --ff-only || { echo 'Deploy aborted: could not fast-forward. Check for local changes or diverged history on the server.'; exit 1; } && flow-deploy deploy --tag $DEPLOY_TAG"
+            "cd $dir && flow-deploy deploy --tag $DEPLOY_TAG"
 
           if [ -n "$REGISTRY_TOKEN" ]; then
             ssh -o StrictHostKeyChecking=no "${port_args[@]}" "$user@$host" \
